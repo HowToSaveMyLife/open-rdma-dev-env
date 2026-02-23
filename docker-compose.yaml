@@ -1,0 +1,17 @@
+version: '3'
+services:
+  open-rdma:
+    privileged: true
+    tty: true
+    stdin_open: true
+    build: .
+    ports:
+      - "2222:2222"
+    volumes:
+      - ./scripts/start-vm.sh:/root/start-vm.sh
+    command: >
+      /bin/bash -c "
+      tmux new-session -d -s open-rdma;
+      tmux send-keys -t open-rdma 'cd /root && ./start-vm.sh' C-m;
+      tmux attach-session -t open-rdma;
+      "
