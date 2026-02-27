@@ -1,30 +1,19 @@
 #!/bin/bash
 echo "Setting up network interface..."
-ip link set ens3 up
+NET_INTERFACE=$(ip -o link show | awk -F': ' '{print $2}' | grep -E '^en' | head -n 1)
+ip link set $NET_INTERFACE up
 
 cat > /etc/netplan/01-static-ip.yaml << EOF
 network:
   version: 2
   ethernets:
-    ens3:
+    $NET_INTERFACE:
       dhcp4: true
       nameservers:
         addresses: [8.8.8.8, 114.114.114.114]
 EOF
 
 netplan apply
-
-# install rust toolchain
-if ! command -v rustup &> /dev/null
-then
-    echo "Installing Rust toolchain..."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source $HOME/.cargo/env
-    rustup default stable
-    source $HOME/.cargo/env
-else
-    echo "Rust toolchain already installed."
-fi
 
 cd /root/open-rdma/open-rdma-driver
 make install
@@ -59,3 +48,10 @@ allocate_hugepages() {
 }
 
 allocate_hugepages 2048
+
+mkdir -p /root/share
+mount -t 9p -o trans=virtio,version=9p2000.L host0 /root/share
+
+cp /root/share/authorized_keys /root/.ssh/authorized_keys
+chown root:root /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys

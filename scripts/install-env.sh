@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# set up network
 echo "setting up network..."
 mkdir -p /run/systemd/resolve/
 echo "nameserver 8.8.8.8" > /run/systemd/resolve/stub-resolv.conf
@@ -7,6 +8,8 @@ echo "nameserver 8.8.8.8" > /run/systemd/resolve/stub-resolv.conf
 export http_proxy=http://172.17.0.1:1081
 export https_proxy=http://172.17.0.1:1081
 
+
+# install dependencies
 echo "installing dependencies..."
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -27,25 +30,14 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libtcl8.6 \
     curl \
     git \
-    vim \
-
-# echo "installing Rust..."
-# # 安装 Rust（官方方式）
-# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-# . $HOME/.cargo/env
-
-echo "installing open-rdma-driver..."
-cd /root/open-rdma/open-rdma-driver
-make
+    vim
 
 
 # 安装 Bluespec 编译器
 echo "installing Bluespec compiler..."
-cd /root/open-rdma
+cd /root
 rm -rf bsc-*
 
-# 需要选择适合的Ubuntu 版本
-# wget https://github.com/B-Lang-org/bsc/releases/download/2022.01/bsc-2022.01-ubuntu-20.04.tar.gz
 wget https://github.com/B-Lang-org/bsc/releases/download/2025.01.1/bsc-2025.01.1-ubuntu-24.04.tar.gz
 tar zxf bsc-*
 
@@ -53,15 +45,7 @@ BSC_FILE_NAME=`ls bsc-*.tar.gz`
 BSC_DIR_NAME=`basename $BSC_FILE_NAME .tar.gz`
 BLUESPEC_HOME=`realpath $BSC_DIR_NAME`
 
-# BASH_PROFILE=$HOME/.bash_profile
 BASH_RC=$HOME/.bashrc
-
-# touch $BASH_PROFILE
-# cat <<EOF >> $BASH_PROFILE
-# # BSV required env
-# export BLUESPECDIR="$BLUESPEC_HOME/lib"
-# export PATH="$PATH:$BLUESPEC_HOME/bin"
-# EOF
 
 touch $BASH_RC
 cat <<EOF >> $BASH_RC
@@ -71,7 +55,8 @@ export PATH="\$PATH:$BLUESPEC_HOME/bin"
 EOF
 
 rm -rf bsc-*.tar.gz
-source $BASH_RC
+# export BLUESPECDIR="$BLUESPEC_HOME/lib"
+# export PATH="$PATH:$BLUESPEC_HOME/bin"
 
 
 # 安装 Miniconda 和 Python 包
@@ -87,9 +72,7 @@ conda init --all
 pip install cocotb==1.9.2 cocotb-test cocotbext-pcie cocotbext-axi scapy
 
 
-echo "making verilog..."
-cd /root/open-rdma/open-rdma-rtl/test/cocotb && make verilog
-
+# set up open-rdma
 touch /etc/systemd/system/open-rdma.service
 cat <<EOF >> /etc/systemd/system/open-rdma.service
 [Unit]
@@ -98,7 +81,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/root/open-rdma/scripts/start-open-rdma.sh
+ExecStart=/root/scripts/start-open-rdma.sh
 Restart=on-failure
 
 [Install]
@@ -109,11 +92,13 @@ systemctl enable open-rdma.service
 
 ssh-keygen -A
 systemctl enable ssh.service
-cp /root/open-rdma/scripts/authorized_keys /root/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys
+
 
 cat <<EOF >> $BASH_RC
 # proxy
 export http_proxy=http://172.17.0.1:1081
 export https_proxy=http://172.17.0.1:1081
+. "$HOME/.cargo/env"
 EOF
+
+rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*

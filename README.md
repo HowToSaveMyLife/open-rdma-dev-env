@@ -9,23 +9,46 @@
 
 ## 2. 替换 SSH 公钥
 
-默认公钥文件：`scripts/authorized_keys`
+默认公钥文件：`authorized_keys`
 
 将你公钥写入该文件（例如 `~/.ssh/id_ed25519.pub`）：
 
 ```bash
-cp ~/.ssh/id_ed25519.pub scripts/authorized_keys
+cp ~/.ssh/id_ed25519.pub authorized_keys
 ```
 
-> 说明：如果你在容器已经构建完成后才修改 `scripts/authorized_keys`，需要重新构建，新密钥才会生效。
+>启动容器时会将 `authorized_keys` 中的公钥写入虚机的 `/root/.ssh/authorized_keys`，无需重新构建镜像即可生效
 
-## 3. 代理配置
+## 3. 镜像构建与启动
+
+### 3.1 使用预构建镜像
+
+我们已将构建好的镜像推送到阿里云和 Docker Hub，你可以直接使用：
+
+- 阿里云镜像：
+```
+IMAGE_REPO=crpi-j4qy2kq2mmf6tmse.cn-beijing.personal.cr.aliyuncs.com/open-rdma/open-rdma docker compose up -d
+```
+
+- Docker Hub 镜像：
+```
+IMAGE_REPO=harum1chi/open-rdma docker compose up -d
+```
+
+### 3.2 本地构建镜像
+
+如果你需要修改 Dockerfile 或安装脚本，可以选择本地构建镜像：
+```
+docker compose up -d --build
+```
+
+#### 代理配置
 
 当前仓库里代理地址为Docker默认网桥 `http://172.17.0.1:1081`
 
 根据你的实际环境取消代理或修改地址
 
-需要修改的文件有两处：
+需要修改的文件有三处：
 
 1. `Dockerfile`
 	- `ENV HTTP_PROXY=...`
@@ -36,12 +59,11 @@ cp ~/.ssh/id_ed25519.pub scripts/authorized_keys
 	- `export https_proxy=...`
 	- 末尾写入 `.bashrc` 的 proxy 配置
 
-## 3. 构建镜像并启动
-构建并启动容器：
+3. `scripts/get-src.sh`
+	- `export http_proxy=...`
+	- `export https_proxy=...`
 
-```bash
-docker compose up open-rdma -d
-```
+## 4. 连接虚拟机
 
 tmux 会自动启动并运行 QEMU 虚机，稍等片刻后即可通过 SSH 连接：
 
@@ -58,6 +80,8 @@ docker compose exec open-rdma bash
 ```bash
 tmux attach-session -t open-rdma
 ```
+
+退出 tmux：`Ctrl+B D`
 
 ## 5. 防火墙与端口放行
 
@@ -81,28 +105,32 @@ tmux attach-session -t open-rdma
 	- 修改后必须重新 build
 
 3. 密钥不生效
-	- 确认 `scripts/authorized_keys` 内容是**完整单行公钥**
-	- 确认修改公钥后做了镜像重建
+	- 确认 `authorized_keys` 内容是**完整单行公钥**
+	- 修改 `authorized_keys` 后无需重建镜像，直接重启容器即可生效
 
 4. 端口冲突
 	- 若宿主机 `2222` 已被占用，需修改 `docker-compose.yaml` 的端口映射
 
 5. 构建时间长
 	- 首次构建会下载大量依赖（含工具链和镜像），属于预期行为
-    - 后续构建会利用downloader缓存，时间会大幅缩短,但virt-make-fs仍消耗较多时间
+    - 后续构建会利用downloader缓存，时间会大幅缩短，但qemu镜像的构建以及virt-make-fs仍消耗较多时间
 
 # open-rdma 使用指南
-## 1. 构建open-rdma-rtl backend
 
-```bash
-cd open-rdma-rtl/tests/cocotb && make verilog
-```
+## 1. 构建open-rdma-driver并运行测试
 
-## 2. 构建open-rdma-driver并运行测试
 测试脚本会自动编译driver和cocotb测试代码，并运行测试
 
 示例：
 ```bash
 cd open-rdma-driver && ./tests/base_test/scripts/test_send_recv_sim.sh
 ```
-首次编译会下载rust工具链和依赖，cocotb测试会调用verilator进行编译，时间较长
+首次编译rust代码会比较慢，后续会利用cargo缓存加速编译，cocotb测试会调用verilator进行编译，时间较长
+
+## 2. 编译open-rdma-rtl backend
+
+镜像已经将 Verilog 文件生成，如果修改了rtl代码需要重新生成。
+
+```bash
+cd open-rdma-rtl/test/cocotb && make verilog
+```

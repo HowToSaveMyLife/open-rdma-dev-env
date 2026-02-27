@@ -1,14 +1,16 @@
 version: '3'
 services:
   open-rdma:
+    image: ${IMAGE_REPO:-open-rdma}:${TAG:-latest}
+    build: .
     privileged: true
     tty: true
     stdin_open: true
-    build: .
     ports:
       - "2222:2222"
     volumes:
       - ./scripts/start-vm.sh:/root/start-vm.sh
+      - ./authorized_keys:/root/share/authorized_keys
     command: >
       /bin/bash -c "
       tmux new-session -d -s open-rdma;

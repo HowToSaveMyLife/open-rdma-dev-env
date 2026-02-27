@@ -15,6 +15,7 @@ exec qemu-system-x86_64 \
     -smp 16 \
     -kernel /boot/vmlinuz-6.8.0-94-generic \
     -initrd /boot/initrd.img-6.8.0-94-generic \
+    -virtfs local,path=/root/share,mount_tag=host0,security_model=mapped-xattr,readonly=off \
     -drive file=/root/rootfs.qcow2,format=qcow2,if=virtio \
     -append "root=LABEL=cloudimg-rootfs rw console=ttyS0" \
     -nographic \
