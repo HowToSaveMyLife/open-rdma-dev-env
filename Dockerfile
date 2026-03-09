@@ -24,7 +24,9 @@ RUN apt-get update && apt-get install -y \
 
 FROM downloader AS rootfs-builder
 
-COPY scripts ./scripts
+RUN mkdir ./scripts
+
+COPY scripts/install-env.sh ./scripts
 
 RUN mkdir -p /root/share && \
     mkdir -p $ROOTFS_DIR && \
@@ -37,6 +39,10 @@ RUN mkdir -p /root/share && \
     chroot $ROOTFS_DIR /usr/bin/bash < ./scripts/install-env.sh 2>&1 | tee /root/install.log
 
 FROM rootfs-builder AS final
-RUN chroot $ROOTFS_DIR /usr/bin/bash < ./scripts/get-src.sh 2>&1 | tee /root/get-src.log && \
+
+COPY scripts ./scripts
+
+RUN cp -r scripts $ROOTFS_DIR/root/ && \
+    chroot $ROOTFS_DIR /usr/bin/bash < ./scripts/get-src.sh 2>&1 | tee /root/get-src.log && \
     virt-make-fs --label cloudimg-rootfs --format=qcow2 --type=ext4 --size=+2G $ROOTFS_DIR rootfs.qcow2 && \
     rm -rf $ROOTFS_DIR ubuntu-24.04.img
